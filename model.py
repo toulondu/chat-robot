@@ -320,3 +320,37 @@ print("mask:", mask)
 print("max_target_len:", max_target_len)
 
 # 我们这里选择seq2seq作为生成模型，所以我们接下来对 encoder和decoder进行编码 todo..
+# version1:简单点，使用双向RNN，gate采用GRU
+
+# encoder
+class EncoderRNN(nn.Module):
+    def __init__(self, hidden_size, embedding, n_layers=1, dropout=0):
+        super(EncoderRNN, self).__init__()
+        self.n_layers = n_layers
+        self.hidden_size = hidden_size
+        self.embedding = embedding
+
+        # 初始化GRU; input_size和hidden_size参数都设置为'hidden_size'
+        # 因为我们的输入数据的embedding后特征数为hidden_size 
+        # 第三个参数为gru层数  最后一个参数表示使用双向GRU
+        self.gru = nn.GRU(hidden_size, hidden_size, n_layers,
+                          dropout=(0 if n_layers == 1 else dropout), bidirectional=True)
+
+    def forward(self, input_seq, input_lengths, hidden=None):
+        # 将单词索引转换为词向量
+        embedded = self.embedding(input_seq)
+        # 为RNN模块打包填充batch序列，第一个参数要求我们已经满足:需从长到段排列，形状[max_length,batch_size,*],具体请查看API
+        # 注意这个打包的作用，因为短句在填充后有大量的pad标记，比如'no way pad pad pad pad',而我们在输入时序模型时，并不希望在单词'way'的隐藏输出h('way')得到之后，再继续对后面的4个pad进行后续RNN运算，而是直接将h('way')作为这个句子的最终表示
+        # 这个打包就是用在这里的，将打包后的结果传递给RNN，GRU,LSTM等模型，模型就知道在何处得到输出，而不会再对填充数据进行运算。
+        # 另外，打包后得到的数据为PackedSequence类型，需要用pad_packed_sequence解压回tensor
+        packed = nn.utils.rnn.pack_padded_sequence(embedded, input_lengths)
+        # 正向通过GRU  第二个参数为初始隐藏向量，形为[num_layers * num_directions, batch, hidden_size]。 传None也行
+        outputs, hidden = self.gru(packed, hidden)
+        # 打开填充
+        outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs)
+        # 总和双向GRU输出，双向GRU的输出是把正向和反向的输出concat起来的。 我们则将它们取出相加
+        outputs = outputs[:, :, :self.hidden_size] + outputs[:, : ,self.hidden_size:]
+        # 返回输出和最终隐藏状态
+        return outputs, hidden
+
+# decoder
