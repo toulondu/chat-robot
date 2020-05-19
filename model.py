@@ -755,12 +755,12 @@ def startChat():
     evaluateInput(encoder, decoder, searcher, voc)
 
 # 运行训练迭代
-# if not loadFilename:
-print("Starting Training!")
-trainIters(model_name, voc, pairs, encoder, decoder, encoder_optimizer, decoder_optimizer,
-        embedding, encoder_n_layers, decoder_n_layers, save_dir, n_iteration, batch_size,
-        print_every, save_every, clip, corpus_name, loadFilename)
-# else:
-startChat()
+if not loadFilename:
+    print("Starting Training!")
+    trainIters(model_name, voc, pairs, encoder, decoder, encoder_optimizer, decoder_optimizer,
+            embedding, encoder_n_layers, decoder_n_layers, save_dir, n_iteration, batch_size,
+            print_every, save_every, clip, corpus_name, loadFilename)
+else:
+    startChat()
 
 
